@@ -1,0 +1,40 @@
+# peering-linux.azcli
+
+rgus=rg-eastus2
+rgbr=rg-brazilsouth
+
+# Parametros do Rede Virtual
+vnetbr=vnet-brazilsouth
+vnetus=vnet-eastus2
+
+# Parametros dos VMs
+vmbr=vm-brazilsouth
+vmus=vm-eastus2
+img=UbuntuLTS
+sku=Standard_DS1_v2
+user=azureuser
+
+# Criar Grupo de Recursos
+az group create -n $rgbr -l brazilsouth
+az group create -n $rgus -l eastus2
+
+# Criar VNET + Subnet do East US 2
+az network vnet create -g $rgus -n $vnetus --address-prefixes 10.0.0.0/16 --subnet-name default --subnet-prefixes 10.0.0.0/24
+az network vnet create -g $rgbr -n $vnetbr --address-prefixes 10.0.0.0/16 --subnet-name default --subnet-prefixes 10.0.0.0/24
+
+# Obter Chave SSH
+ssh-keygen -m PEM -t rsa -b 2048
+
+# Criar VMs
+az vm create -g $rgbr -n $vmbr --image $img --size $sku --admin-username $user --ssh-key-value ~/.ssh/id_rsa.pub
+az vm create -g $rgus -n $vmus --image $img --size $sku --admin-username $user --ssh-key-value ~/.ssh/id_rsa.pub
+
+# Obter IP Publico da VM
+ipbr=$(az vm show -d -g $rgbr -n $vmbr --query publicIps -o tsv)
+ipus=$(az vm show -d -g $rgus -n $vmus --query publicIps -o tsv)
+
+# Entrar na VM BrazilSouth | 10.0.0.4
+ssh -i ~/.ssh/id_rsa $user@$ipbr
+
+# Entrar na VM EastUS2 | 20.0.0.4
+ssh -i ~/.ssh/id_rsa $user@$ipus
