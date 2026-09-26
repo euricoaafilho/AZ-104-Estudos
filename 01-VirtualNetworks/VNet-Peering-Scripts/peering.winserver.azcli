@@ -1,0 +1,82 @@
+# peering-winserver.azcli
+
+# --- Configurações Iniciais ---
+
+# Login no Azure (descomente e execute se ainda não estiver logado)
+# az login
+
+# Parâmetros Gerais para Grupos de Recursos (Resource Groups)
+rgus=rg-eastus2
+rgbr=rg-brazilsouth
+
+# Parâmetros das Redes Virtuais (VNets)
+vnetbr=vnet-brazilsouth
+vnetus=vnet-eastus2
+
+# Parâmetros das Máquinas Virtuais (VMs)
+# Imagem do sistema operacional para as VMs (Windows Server 2019 Datacenter)
+img=Win2019Datacenter
+# SKU (tamanho) da VM
+sku=Standard_DS1_v2
+# Nome de usuário administrador para as VMs
+user=azureuser
+# Senha para o usuário administrador das VMs
+pass=training2023
+
+# --- Início da Seção de Criação de Recursos ---
+
+# Criar Grupos de Recursos nas regiões especificadas
+az group create -n $rgbr -l brazilsouth
+az group create -n $rgus -l eastus2
+
+# Criar VNET + Subnet no Brazil South
+# --address-prefixes define o espaço de endereço da VNet (10.0.0.0/16)
+# --subnet-name e --subnet-prefixes definem a sub-rede padrão (10.0.0.0/24)
+az network vnet create -g $rgbr -n $vnetbr --address-prefixes 10.0.0.0/16 --subnet-name default --subnet-prefixes 10.0.0.0/24
+
+# Criar VNET + Subnet no East US 2
+# --address-prefixes define o espaço de endereço da VNet (20.0.0.0/16)
+# --subnet-name e --subnet-prefixes definem a sub-rede padrão (20.0.0.0/24)
+az network vnet create -g $rgus -n $vnetus --address-prefixes 20.0.0.0/16 --subnet-name default --subnet-prefixes 20.0.0.0/24
+
+# Criar VMs (Máquinas Virtuais)
+# As VMs serão criadas com Windows Server 2019 e autenticação por senha.
+# --admin-password usa a variável 'pass' definida acima.
+az vm create -g $rgbr -n $vmbr --image $img --size $sku --admin-username $user --admin-password $pass
+az vm create -g $rgus -n $vmus --image $img --size $sku --admin-username $user --admin-password $pass
+
+# Obter IP Público das VMs criadas (para acesso remoto, e.g., RDP)
+# -d para mostrar detalhes, --query para extrair apenas o publicIps, -o tsv para formato de texto
+ipbr=$(az vm show -d -g $rgbr -n $vmbr --query publicIps -o tsv)
+ipus=$(az vm show -d -g $rgus -n $vmus --query publicIps -o tsv)
+
+# --- Início da Seção de Peering ---
+
+# Se estiver usando Bash no Windows (WSL), esta variável de ambiente pode ser necessária
+# para evitar problemas com a conversão de caminhos.
+export MSYS_NO_PATHCONV=1
+
+# Obter o ID completo da VNET Brazil South
+# Este ID é necessário para configurar o peering remoto
+idvnetbr=$(az network vnet show -g $rgbr -n $vnetbr --query id -o tsv)
+
+# Obter o ID completo da VNET East US 2
+idvnetus=$(az network vnet show -g $rgus -n $vnetus --query id -o tsv)
+
+# Peering entre as VNETs em diferentes regiões
+# Criar Peering da VNet East US 2 para a VNet Brazil South
+# -n define o nome do peering
+# -g define o grupo de recursos da VNet local
+# --vnet-name define o nome da VNet local
+# --remote-vnet define o ID da VNet remota
+# --allow-vnet-access permite o tráfego entre as VNets
+az network vnet peering create -n peering-us-br -g $rgus --vnet-name $vnetus --remote-vnet $idvnetbr --allow-vnet-access
+
+# Criar Peering da VNet Brazil South para a VNet East US 2
+# O peering é bidirecional, então precisamos criar a conexão nos dois sentidos
+az network vnet peering create -n peering-br-us -g $rgbr --vnet-name $vnetbr --remote-vnet $idvnetus --allow-vnet-access
+
+# --- Fim do Script ---
+# Para acessar as VMs Windows, você pode usar o RDP (Remote Desktop Protocol)
+# com os IPs públicos obtidos e as credenciais (azureuser / training2023).
+# Você pode obter o comando RDP no Azure Portal ou usar 'az vm show' para detalhes.
