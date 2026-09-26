@@ -1,0 +1,50 @@
+#!/bin/bash
+
+# --- Configurações Iniciais para a VM ---
+RESOURCE_GROUP_NAME="rg-vnet-peering-demo" # Usar o mesmo RG do primeiro cenário de peering
+LOCATION="eastus"
+
+VNET_NAME="vnet-peering-a" # VNet onde a VM será criada
+SUBNET_NAME="subnet-a"     # Subnet dentro da VNet
+
+VM_NAME="vm-peering-test"
+VM_IMAGE="UbuntuLTS"       # Imagem da VM (Ubuntu Server LTS)
+VM_SIZE="Standard_B1s"     # Tamanho da VM (pode ser ajustado)
+ADMIN_USERNAME="azureuser" # Nome de usuário para acesso SSH
+
+# --- 1. Criar Subnet (se ainda não existir) ---
+# É uma boa prática ter uma subnet dedicada para as VMs
+echo "--- Verificando/Criando Subnet $SUBNET_NAME na VNet $VNET_NAME ---"
+az network vnet subnet show \
+    --name $SUBNET_NAME \
+    --vnet-name $VNET_NAME \
+    --resource-group $RESOURCE_GROUP_NAME &>/dev/null
+
+if [ $? -ne 0 ]; then
+    echo "Subnet $SUBNET_NAME não encontrada, criando..."
+    az network vnet subnet create \
+        --name $SUBNET_NAME \
+        --vnet-name $VNET_NAME \
+        --resource-group $RESOURCE_GROUP_NAME \
+        --address-prefixes 10.0.0.0/24 # Certifique-se de que este prefixo esteja dentro do prefixo da VNet
+else
+    echo "Subnet $SUBNET_NAME já existe."
+fi
+
+# --- 2. Criar Máquina Virtual ---
+echo "--- Criando Máquina Virtual: $VM_NAME ---"
+az vm create \
+    --name $VM_NAME \
+    --resource-group $RESOURCE_GROUP_NAME \
+    --location $LOCATION \
+    --image $VM_IMAGE \
+    --size $VM_SIZE \
+    --admin-username $ADMIN_USERNAME \
+    --vnet-name $VNET_NAME \
+    --subnet $SUBNET_NAME \
+    --public-ip-sku Standard \
+    --generate-ssh-keys # Gera um par de chaves SSH para acesso
+
+echo "--- VM $VM_NAME criada com sucesso! ---"
+echo "Para acessar a VM via SSH, use o IP público e o usuário $ADMIN_USERNAME."
+echo "O IP público será exibido no output do comando 'az vm create'."
