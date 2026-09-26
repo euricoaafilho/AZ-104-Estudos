@@ -1,0 +1,114 @@
+#!/bin/bash
+
+# --- Configurações Iniciais para VNet Peering entre Assinaturas ---
+
+# --- Assinatura 1 (Sua Assinatura Atual) ---
+# Substitua pelo ID da sua assinatura onde a VNet A será criada
+YOUR_SUBSCRIPTION_ID="<SEU_SUBSCRIPTION_ID_AQUI>"
+YOUR_RESOURCE_GROUP_NAME="rg-cross-sub-peering-a"
+YOUR_LOCATION="eastus"
+
+YOUR_VNET_NAME="vnet-cross-sub-a"
+YOUR_VNET_PREFIX="10.0.0.0/16"
+
+# --- Assinatura 2 (Assinatura Remota) ---
+# Substitua pelo ID da assinatura remota onde a VNet B será criada
+REMOTE_SUBSCRIPTION_ID="<ID_DA_ASSINATURA_REMOTA_AQUI>"
+REMOTE_RESOURCE_GROUP_NAME="rg-cross-sub-peering-b"
+REMOTE_LOCATION="eastus" # Pode ser a mesma região ou diferente para Global Peering
+
+REMOTE_VNET_NAME="vnet-cross-sub-b"
+REMOTE_VNET_PREFIX="10.1.0.0/16"
+
+PEERING_AB_NAME="vnet-cross-sub-a-to-b"
+PEERING_BA_NAME="vnet-cross-sub-b-to-a"
+
+# --- 1. Criar Recursos na Sua Assinatura (Assinatura 1) ---
+echo "--- Configurando para a Sua Assinatura: $YOUR_SUBSCRIPTION_ID ---"
+az account set --subscription $YOUR_SUBSCRIPTION_ID
+
+echo "--- Criando Grupo de Recursos: $YOUR_RESOURCE_GROUP_NAME em $YOUR_LOCATION ---"
+az group create --name $YOUR_RESOURCE_GROUP_NAME --location $YOUR_LOCATION
+
+echo "--- Criando VNet A: $YOUR_VNET_NAME com prefixo $YOUR_VNET_PREFIX ---"
+az network vnet create \
+    --name $YOUR_VNET_NAME \
+    --resource-group $YOUR_RESOURCE_GROUP_NAME \
+    --location $YOUR_LOCATION \
+    --address-prefix $YOUR_VNET_PREFIX
+
+# --- 2. Criar Recursos na Assinatura Remota (Assinatura 2) ---
+echo "--- Configurando para a Assinatura Remota: $REMOTE_SUBSCRIPTION_ID ---"
+# ATENÇÃO: Você precisará ter permissões para criar recursos nesta assinatura remota.
+az account set --subscription $REMOTE_SUBSCRIPTION_ID
+
+echo "--- Criando Grupo de Recursos Remoto: $REMOTE_RESOURCE_GROUP_NAME em $REMOTE_LOCATION ---"
+az group create --name $REMOTE_RESOURCE_GROUP_NAME --location $REMOTE_LOCATION
+
+echo "--- Criando VNet B Remota: $REMOTE_VNET_NAME com prefixo $REMOTE_VNET_PREFIX ---"
+az network vnet create \
+    --name $REMOTE_VNET_NAME \
+    --resource-group $REMOTE_RESOURCE_GROUP_NAME \
+    --location $REMOTE_LOCATION \
+    --address-prefix $REMOTE_VNET_PREFIX
+
+# --- 3. Obter Resource IDs das VNets ---
+# Voltar para a sua assinatura para obter o ID da VNet A
+az account set --subscription $YOUR_SUBSCRIPTION_ID
+YOUR_VNET_ID=$(az network vnet show --name $YOUR_VNET_NAME --resource-group $YOUR_RESOURCE_GROUP_NAME --query id --output tsv)
+echo "ID da VNet A (Sua Assinatura): $YOUR_VNET_ID"
+
+# Mudar para a assinatura remota para obter o ID da VNet B
+az account set --subscription $REMOTE_SUBSCRIPTION_ID
+REMOTE_VNET_ID=$(az network vnet show --name $REMOTE_VNET_NAME --resource-group $REMOTE_RESOURCE_GROUP_NAME --query id --output tsv)
+echo "ID da VNet B (Assinatura Remota): $REMOTE_VNET_ID"
+
+# --- 4. Configurar Permissões (PASSO MANUAL CRÍTICO) ---
+echo "--- ATENÇÃO: Configuração de Permissões ---"
+echo "Para que o peering funcione entre assinaturas, a identidade que está executando este script (seu usuário ou Service Principal) precisa ter permissões de 'Network Contributor' (ou equivalente) em AMBAS as VNets."
+echo "Você precisará garantir que seu usuário tenha essas permissões na VNet A (sua assinatura) e na VNet B (assinatura remota)."
+echo "Se você não tiver permissões na assinatura remota, peça ao administrador daquela assinatura para concedê-las."
+echo "Exemplo de comando para conceder permissão (execute na assinatura apropriada):"
+echo "az role assignment create --assignee <seu_email_ou_object_id> --role 'Network Contributor' --scope $YOUR_VNET_ID"
+echo "az role assignment create --assignee <seu_email_ou_object_id> --role 'Network Contributor' --scope $REMOTE_VNET_ID"
+read -p "Pressione Enter para continuar após verificar/configurar as permissões..."
+
+# --- 5. Criar os Peerings ---
+echo "--- Criando Peering de VNet A para VNet B (na Sua Assinatura) ---"
+az account set --subscription $YOUR_SUBSCRIPTION_ID
+az network vnet peering create \
+    --name $PEERING_AB_NAME \
+    --resource-group $YOUR_RESOURCE_GROUP_NAME \
+    --vnet-name $YOUR_VNET_NAME \
+    --remote-vnet $REMOTE_VNET_ID \
+    --allow-vnet-access
+
+echo "--- Criando Peering de VNet B para VNet A (na Assinatura Remota) ---"
+az account set --subscription $REMOTE_SUBSCRIPTION_ID
+az network vnet peering create \
+    --name $PEERING_BA_NAME \
+    --resource-group $REMOTE_RESOURCE_GROUP_NAME \
+    --vnet-name $REMOTE_VNET_NAME \
+    --remote-vnet $YOUR_VNET_ID \
+    --allow-vnet-access
+
+echo "--- Verificando o status do Peering ---"
+az account set --subscription $YOUR_SUBSCRIPTION_ID
+echo "Peering de $YOUR_VNET_NAME para $REMOTE_VNET_NAME:"
+az network vnet peering show \
+    --name $PEERING_AB_NAME \
+    --resource-group $YOUR_RESOURCE_GROUP_NAME \
+    --vnet-name $YOUR_VNET_NAME \
+    --query peeringState -o tsv
+
+az account set --subscription $REMOTE_SUBSCRIPTION_ID
+echo "Peering de $REMOTE_VNET_NAME para $YOUR_VNET_NAME:"
+az network vnet peering show \
+    --name $PEERING_BA_NAME \
+    --resource-group $REMOTE_RESOURCE_GROUP_NAME \
+    --vnet-name $REMOTE_VNET_NAME \
+    --query peeringState -o tsv
+
+echo "--- VNet Peering entre Assinaturas configurado com sucesso! ---"
+echo "Lembre-se de que a comunicação só será possível se as permissões estiverem corretas."
+echo "Lembre-se que, para o script vnet-peering-cross-subscription.azcli, é crucial que você tenha editado os YOUR_SUBSCRIPTION_ID e REMOTE_SUBSCRIPTION_ID com os IDs corretos das suas assinaturas, e que esteja ciente da necessidade de configurar as permissões de "Network Contributor" nas VNets envolvidas.

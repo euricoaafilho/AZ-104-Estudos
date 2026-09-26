@@ -1,0 +1,65 @@
+#!/bin/bash
+
+# --- Configurações Iniciais ---
+RESOURCE_GROUP_NAME="rg-vnet-peering-demo"
+LOCATION="eastus" # Você pode mudar para a região de sua preferência
+
+VNET_A_NAME="vnet-peering-a"
+VNET_A_PREFIX="10.0.0.0/16"
+
+VNET_B_NAME="vnet-peering-b"
+VNET_B_PREFIX="10.1.0.0/16"
+
+PEERING_AB_NAME="vnet-a-to-vnet-b"
+PEERING_BA_NAME="vnet-b-to-vnet-a"
+
+echo "--- Criando Grupo de Recursos: $RESOURCE_GROUP_NAME em $LOCATION ---"
+az group create --name $RESOURCE_GROUP_NAME --location $LOCATION
+
+echo "--- Criando VNet A: $VNET_A_NAME com prefixo $VNET_A_PREFIX ---"
+az network vnet create \
+    --name $VNET_A_NAME \
+    --resource-group $RESOURCE_GROUP_NAME \
+    --location $LOCATION \
+    --address-prefix $VNET_A_PREFIX
+
+echo "--- Criando VNet B: $VNET_B_NAME com prefixo $VNET_B_PREFIX ---"
+az network vnet create \
+    --name $VNET_B_NAME \
+    --resource-group $RESOURCE_GROUP_NAME \
+    --location $LOCATION \
+    --address-prefix $VNET_B_PREFIX
+
+echo "--- Criando Peering de $VNET_A_NAME para $VNET_B_NAME ---"
+az network vnet peering create \
+    --name $PEERING_AB_NAME \
+    --resource-group $RESOURCE_GROUP_NAME \
+    --vnet-name $VNET_A_NAME \
+    --remote-vnet $VNET_B_NAME \
+    --allow-vnet-access
+
+echo "--- Criando Peering de $VNET_B_NAME para $VNET_A_NAME ---"
+az network vnet peering create \
+    --name $PEERING_BA_NAME \
+    --resource-group $RESOURCE_GROUP_NAME \
+    --vnet-name $VNET_B_NAME \
+    --remote-vnet $VNET_A_NAME \
+    --allow-vnet-access
+
+echo "--- Verificando o status do Peering ---"
+echo "Peering de $VNET_A_NAME para $VNET_B_NAME:"
+az network vnet peering show \
+    --name $PEERING_AB_NAME \
+    --resource-group $RESOURCE_GROUP_NAME \
+    --vnet-name $VNET_A_NAME \
+    --query peeringState -o tsv
+
+echo "Peering de $VNET_B_NAME para $VNET_A_NAME:"
+az network vnet peering show \
+    --name $PEERING_BA_NAME \
+    --resource-group $RESOURCE_GROUP_NAME \
+    --vnet-name $VNET_B_NAME \
+    --query peeringState -o tsv
+
+echo "--- Peering configurado com sucesso! ---"
+echo "Para testar, você pode criar VMs em cada VNet e tentar pingar uma à outra."
