@@ -1,40 +1,82 @@
 # peering-linux.azcli
 
+# Variáveis para Grupos de Recursos (Resource Groups)
 rgus=rg-eastus2
 rgbr=rg-brazilsouth
 
-# Parametros do Rede Virtual
+# Variáveis para Redes Virtuais (VNets)
 vnetbr=vnet-brazilsouth
 vnetus=vnet-eastus2
 
-# Parametros dos VMs
+# Variáveis para Máquinas Virtuais (VMs)
 vmbr=vm-brazilsouth
 vmus=vm-eastus2
 img=UbuntuLTS
 sku=Standard_DS1_v2
 user=azureuser
 
-# Criar Grupo de Recursos
+# --- Início da Seção de Criação de Recursos ---
+
+# Criar Grupos de Recursos nas regiões especificadas
 az group create -n $rgbr -l brazilsouth
 az group create -n $rgus -l eastus2
 
-# Criar VNET + Subnet do East US 2
+# Criar VNET + Subnet no East US 2
+# --address-prefixes define o espaço de endereço da VNet
+# --subnet-name e --subnet-prefixes definem a sub-rede padrão
 az network vnet create -g $rgus -n $vnetus --address-prefixes 10.0.0.0/16 --subnet-name default --subnet-prefixes 10.0.0.0/24
-az network vnet create -g $rgbr -n $vnetbr --address-prefixes 10.0.0.0/16 --subnet-name default --subnet-prefixes 10.0.0.0/24
 
-# Obter Chave SSH
+# Criar VNET + Subnet no Brazil South
+az network vnet create -g $rgbr -n $vnetbr --address-prefixes 20.0.0.0/16 --subnet-name default --subnet-prefixes 20.0.0.0/24
+
+# Gerar Chave SSH para acesso às VMs (se ainda não existir)
+# -m PEM especifica o formato da chave
+# -t rsa -b 2048 especifica o tipo e tamanho da chave
 ssh-keygen -m PEM -t rsa -b 2048
 
-# Criar VMs
+# Criar VMs nas respectivas VNets e Grupos de Recursos
+# --image define a imagem do sistema operacional (UbuntuLTS)
+# --size define o tamanho da VM (Standard_DS1_v2)
+# --admin-username define o usuário administrador
+# --ssh-key-value usa a chave pública gerada para autenticação SSH
 az vm create -g $rgbr -n $vmbr --image $img --size $sku --admin-username $user --ssh-key-value ~/.ssh/id_rsa.pub
 az vm create -g $rgus -n $vmus --image $img --size $sku --admin-username $user --ssh-key-value ~/.ssh/id_rsa.pub
 
-# Obter IP Publico da VM
+# Obter IP Público das VMs criadas
+# -d para mostrar detalhes, --query para extrair apenas o publicIps, -o tsv para formato de texto
 ipbr=$(az vm show -d -g $rgbr -n $vmbr --query publicIps -o tsv)
 ipus=$(az vm show -d -g $rgus -n $vmus --query publicIps -o tsv)
 
-# Entrar na VM BrazilSouth | 10.0.0.4
+# --- Início da Seção de Peering ---
+
+# Se estiver usando Bash no Windows (WSL), esta variável de ambiente pode ser necessária
+# para evitar problemas com a conversão de caminhos.
+export MSYS_NO_PATHCONV=1
+
+# Obter o ID completo da VNET Brazil South
+# Este ID é necessário para configurar o peering remoto
+idvnetbr=$(az network vnet show -g $rgbr -n $vnetbr --query id -o tsv)
+
+# Obter o ID completo da VNET East US 2
+idvnetus=$(az network vnet show -g $rgus -n $vnetus --query id -o tsv)
+
+# Criar Peering da VNet East US 2 para a VNet Brazil South
+# -n define o nome do peering
+# -g define o grupo de recursos da VNet local
+# --vnet-name define o nome da VNet local
+# --remote-vnet define o ID da VNet remota
+# --allow-vnet-access permite o tráfego entre as VNets
+az network vnet peering create -n peering-us-br -g $rgus --vnet-name $vnetus --remote-vnet $idvnetbr --allow-vnet-access
+
+# Criar Peering da VNet Brazil South para a VNet East US 2
+# O peering é bidirecional, então precisamos criar a conexão nos dois sentidos
+az network vnet peering create -n peering-br-us -g $rgbr --vnet-name $vnetbr --remote-vnet $idvnetus --allow-vnet-access
+
+# --- Início da Seção de Acesso SSH ---
+
+# Comando para entrar na VM BrazilSouth (endereço IP 20.0.0.4 na VNet)
+# -i especifica o arquivo da chave privada SSH
 ssh -i ~/.ssh/id_rsa $user@$ipbr
 
-# Entrar na VM EastUS2 | 20.0.0.4
+# Comando para entrar na VM EastUS2 (endereço IP 10.0.0.4 na VNet)
 ssh -i ~/.ssh/id_rsa $user@$ipus
