@@ -1,0 +1,66 @@
+# -----------------------------------------------------------------------------
+# Script: 03-aad-integration.azcli
+# Descrição: Configura a integração do VPN Gateway Point-to-Site com o Azure AD
+#            para autenticação. Isso inclui a criação de um App Registration
+#            e a configuração das permissões.
+# -----------------------------------------------------------------------------
+
+# --- Configurações Iniciais (devem ser as mesmas dos scripts anteriores) ---
+rg_name="rg-vpn-p2s"
+vnet_name="vnet-p2s"
+vpn_gateway_name="vnet-p2s-gw"
+tenant_id=$(az account show --query tenantId -o tsv) # Obtém o Tenant ID da sua assinatura Azure
+
+# Nome do App Registration que será criado no Azure AD
+aad_app_name="AzureVPN-P2S-App"
+
+echo "Iniciando a configuração da integração com Azure AD para VPN P2S..."
+
+# 1. Criar um App Registration no Azure AD
+# Este aplicativo representará o VPN Gateway no Azure AD e será usado para autenticação.
+echo "Criando o App Registration '$aad_app_name' no Azure AD..."
+app_id=$(az ad app create \
+    --display-name $aad_app_name \
+    --homepage "https://localhost" \
+    --identifier-uris "https://vpn.azure.com/$aad_app_name" \
+    --query appId -o tsv)
+
+echo "App Registration criado com App ID: $app_id"
+
+# 2. Criar um Service Principal para o App Registration
+# O Service Principal é a identidade do aplicativo no seu tenant.
+echo "Criando o Service Principal para o App ID: $app_id..."
+az ad sp create --id $app_id --output none
+
+# 3. Adicionar permissões de API para o App Registration
+# O aplicativo precisa de permissão para acessar o Microsoft Graph para ler perfis de usuário.
+echo "Adicionando permissões de API para o App Registration..."
+az ad app permission add \
+    --id $app_id \
+    --api 00000003-0000-0000-c000-000000000000 \
+    --api-permissions 1cda74f2-2616-4834-b122-505b07b66646=Scope \
+    --output none
+
+# 4. Conceder consentimento de administrador para as permissões
+# Isso permite que o aplicativo use as permissões sem que cada usuário precise consentir.
+echo "Concedendo consentimento de administrador para as permissões do App Registration..."
+az ad app permission grant \
+    --id $app_id \
+    --api 00000003-0000-0000-c000-000000000000 \
+    --output none
+
+# 5. Configurar o VPN Gateway para usar a autenticação Azure AD
+# Isso vincula o App Registration e o Tenant ID ao seu VPN Gateway.
+echo "Configurando o VPN Gateway '$vpn_gateway_name' para usar autenticação Azure AD..."
+az network vnet-gateway update \
+    --resource-group $rg_name \
+    --name $vpn_gateway_name \
+    --set VpnClientConfiguration.AadTenant="https://login.microsoftonline.com/$tenant_id" \
+    --set VpnClientConfiguration.AadAudience="azures://vpn.azure.com/$app_id" \
+    --set VpnClientConfiguration.AadIssuer="https://sts.windows.net/$tenant_id/" \
+    --output none
+
+echo "Integração com Azure AD configurada com sucesso para o VPN Gateway!"
+echo "Lembre-se de que o VPN Gateway deve estar totalmente provisionado antes de executar este script."
+echo "App ID do registro de aplicativo: $app_id"
+echo "Tenant ID: $tenant_id"

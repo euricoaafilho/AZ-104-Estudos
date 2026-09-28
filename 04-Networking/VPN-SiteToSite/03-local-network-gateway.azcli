@@ -1,0 +1,39 @@
+# -----------------------------------------------------------------------------
+# Script: 03-local-network-gateway.azcli
+# Descrição: Cria o Local Network Gateway no Azure, que representa o dispositivo
+#            VPN e o espaço de endereço da sua rede local (on-premises).
+# -----------------------------------------------------------------------------
+
+# --- Configurações Iniciais (devem ser as mesmas dos scripts anteriores) ---
+rg_name="rg-vpn-s2s"
+location="eastus"
+local_gateway_name="lng-onprem" # Nome do Local Network Gateway
+
+# --- ATENÇÃO: CONFIGURAÇÕES DA SUA REDE LOCAL ---
+# Você precisará substituir estes valores pelos detalhes da sua rede on-premises.
+# Para fins de teste, estamos usando valores de exemplo.
+
+# Endereço IP público do seu dispositivo VPN local (ex: seu roteador, firewall, etc.)
+# Este é o IP público que o Azure VPN Gateway usará para iniciar a conexão.
+onprem_public_ip="203.0.113.1" # <<<<<<< SUBSTITUA PELO IP PÚBLICO DO SEU DISPOSITIVO VPN LOCAL
+
+# Espaço de endereço da sua rede local (on-premises)
+# Ex: "192.168.1.0/24" ou "10.0.0.0/16"
+onprem_address_prefix="192.168.1.0/24" # <<<<<<< SUBSTITUA PELO ESPAÇO DE ENDEREÇO DA SUA REDE LOCAL
+
+echo "Iniciando a criação do Local Network Gateway..."
+
+# 1. Criar o Local Network Gateway
+echo "Criando o Local Network Gateway: $local_gateway_name..."
+az network local-gateway create \
+    --resource-group $rg_name \
+    --name $local_gateway_name \
+    --location $location \
+    --gateway-ip-address $onprem_public_ip \
+    --address-prefixes $onprem_address_prefix \
+    --output none
+
+echo "Local Network Gateway '$local_gateway_name' criado com sucesso!"
+echo "IP Público Local: $onprem_public_ip"
+echo "Espaço de Endereço Local: $onprem_address_prefix"
+echo "Lembre-se de que estes valores devem corresponder à sua rede local real para que a VPN funcione."

@@ -1,0 +1,31 @@
+# -----------------------------------------------------------------------------
+# Script: 06-cleanup.azcli
+# Descrição: Remove todos os recursos criados para o projeto de VPN Site-to-Site.
+#            Isso inclui o Grupo de Recursos principal do Azure VPN Gateway
+#            e o Grupo de Recursos da VM de simulação on-premises.
+# -----------------------------------------------------------------------------
+
+# --- Configurações Iniciais (devem ser as mesmas dos scripts anteriores) ---
+rg_name="rg-vpn-s2s"         # Grupo de Recursos do Azure VPN Gateway
+rg_onprem_name="rg-onprem-sim" # Grupo de Recursos da VM de simulação on-premises
+
+echo "Iniciando o processo de limpeza dos recursos do projeto VPN Site-to-Site..."
+
+# 1. Remover o Grupo de Recursos principal (Azure VPN Gateway, VNet, IPs Públicos, etc.)
+echo "Removendo o Grupo de Recursos principal: $rg_name (isso pode levar alguns minutos)..."
+az group delete \
+    --name $rg_name \
+    --yes \
+    --no-wait \
+    --output none
+
+# 2. Remover o Grupo de Recursos da VM de simulação on-premises
+echo "Removendo o Grupo de Recursos da VM de simulação on-premises: $rg_onprem_name (isso pode levar alguns minutos)..."
+az group delete \
+    --name $rg_onprem_name \
+    --yes \
+    --no-wait \
+    --output none
+
+echo "Comandos para remoção dos Grupos de Recursos enviados. A limpeza completa pode levar um tempo."
+echo "Limpeza concluída!"

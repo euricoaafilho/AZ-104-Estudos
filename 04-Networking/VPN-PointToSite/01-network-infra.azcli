@@ -1,0 +1,67 @@
+# -----------------------------------------------------------------------------
+# Script: 01-network-infra.azcli
+# Descrição: Cria o Grupo de Recursos, a Rede Virtual (VNet) e as Subnets
+#            necessárias para a configuração de um VPN Gateway Point-to-Site
+#            e para hospedar VMs.
+# -----------------------------------------------------------------------------
+
+# --- Configurações Iniciais ---
+
+# Login no Azure (descomente e execute se ainda não estiver logado)
+# az login
+
+# Variáveis para o Grupo de Recursos e VNet
+rg_name="rg-vpn-p2s" # Nome do Grupo de Recursos
+location="eastus"    # Região onde os recursos serão criados (pode ser outra de sua preferência)
+vnet_name="vnet-p2s" # Nome da Rede Virtual
+vnet_prefix="10.10.0.0/16" # Prefixo de endereço da VNet
+
+# Subnet para o Gateway VPN (OBRIGATÓRIO ser GatewaySubnet)
+gateway_subnet_name="GatewaySubnet"
+gateway_subnet_prefix="10.10.0.0/24" # Mínimo recomendado é /27. /24 é seguro.
+
+# Subnet para as VMs (onde suas máquinas virtuais serão implantadas)
+vm_subnet_name="VMsSubnet"
+vm_subnet_prefix="10.10.1.0/24" # Um prefixo diferente dentro da VNet
+
+echo "Iniciando a criação da infraestrutura de rede para VPN P2S..."
+
+# 1. Criar Grupo de Recursos
+echo "Criando o Grupo de Recursos: $rg_name na região $location..."
+az group create \
+    --name $rg_name \
+    --location $location \
+    --output none
+
+# 2. Criar Rede Virtual (VNet)
+echo "Criando a Rede Virtual: $vnet_name com prefixo $vnet_prefix..."
+az network vnet create \
+    --resource-group $rg_name \
+    --name $vnet_name \
+    --address-prefix $vnet_prefix \
+    --location $location \
+    --output none
+
+# 3. Criar a Sub-rede para o Gateway VPN
+echo "Criando a GatewaySubnet: $gateway_subnet_name com prefixo $gateway_subnet_prefix na VNet $vnet_name..."
+az network vnet subnet create \
+    --resource-group $rg_name \
+    --vnet-name $vnet_name \
+    --name $gateway_subnet_name \
+    --address-prefix $gateway_subnet_prefix \
+    --output none
+
+# 4. Criar a Sub-rede para as VMs
+echo "Criando a VMsSubnet: $vm_subnet_name com prefixo $vm_subnet_prefix na VNet $vnet_name..."
+az network vnet subnet create \
+    --resource-group $rg_name \
+    --vnet-name $vnet_name \
+    --name $vm_subnet_name \
+    --address-prefix $vm_subnet_prefix \
+    --output none
+
+echo "Infraestrutura de rede criada com sucesso!"
+echo "Grupo de Recursos: $rg_name"
+echo "VNet: $vnet_name ($vnet_prefix)"
+echo "GatewaySubnet: $gateway_subnet_name ($gateway_subnet_prefix)"
+echo "VMsSubnet: $vm_subnet_name ($vm_subnet_prefix)"

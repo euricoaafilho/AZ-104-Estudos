@@ -1,0 +1,40 @@
+# -----------------------------------------------------------------------------
+# Script: 04-vpn-connection.azcli
+# Descrição: Cria a conexão VPN Site-to-Site entre o Azure VPN Gateway
+#            e o Local Network Gateway.
+# -----------------------------------------------------------------------------
+
+# --- Configurações Iniciais (devem ser as mesmas dos scripts anteriores) ---
+rg_name="rg-vpn-s2s"
+location="eastus"
+vpn_gateway_name="vnet-s2s-gw"
+local_gateway_name="lng-onprem"
+connection_name="s2s-connection" # Nome da conexão VPN
+
+# --- Chave Compartilhada (Shared Key) ---
+# Esta chave deve ser a mesma configurada no seu dispositivo VPN local.
+# É uma senha para autenticar a conexão VPN.
+shared_key="SuaChaveSecreta123!" # <<<<<<< SUBSTITUA POR UMA CHAVE SEGURA E COMPLEXA
+
+echo "Iniciando a criação da conexão VPN Site-to-Site..."
+
+# 1. Criar a Conexão VPN
+# Esta conexão vincula o Azure VPN Gateway ao Local Network Gateway.
+# - --connection-type IPsec: Indica que é uma conexão IPsec (padrão para S2S).
+# - --routing-weight 10: Peso de roteamento para a conexão (pode ser ajustado).
+# - --shared-key: A chave pré-compartilhada para autenticação.
+echo "Criando a conexão VPN: $connection_name entre $vpn_gateway_name e $local_gateway_name..."
+az network vnet-gateway connection create \
+    --resource-group $rg_name \
+    --name $connection_name \
+    --vnet-gateway1 $vpn_gateway_name \
+    --local-gateway2 $local_gateway_name \
+    --location $location \
+    --connection-type IPsec \
+    --routing-weight 10 \
+    --shared-key $shared_key \
+    --output none
+
+echo "Conexão VPN '$connection_name' criada com sucesso!"
+echo "Lembre-se de configurar a mesma chave compartilhada ('$shared_key') no seu dispositivo VPN local."
+echo "A conexão pode levar alguns minutos para ser estabelecida após a configuração em ambos os lados."

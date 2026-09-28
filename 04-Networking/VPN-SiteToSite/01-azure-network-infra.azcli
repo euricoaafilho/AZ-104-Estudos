@@ -1,0 +1,51 @@
+# -----------------------------------------------------------------------------
+# Script: 01-azure-network-infra.azcli
+# Descrição: Cria o Grupo de Recursos, a Rede Virtual (VNet) e a GatewaySubnet
+#            necessários para a configuração de um VPN Gateway Site-to-Site no Azure.
+# -----------------------------------------------------------------------------
+
+# --- Configurações Iniciais ---
+
+# Login no Azure (descomente e execute se ainda não estiver logado)
+# az login
+
+# Variáveis para o Grupo de Recursos e VNet
+rg_name="rg-vpn-s2s" # Nome do Grupo de Recursos para S2S
+location="eastus"    # Região onde os recursos serão criados (pode ser outra de sua preferência)
+vnet_name="vnet-s2s" # Nome da Rede Virtual para S2S
+vnet_prefix="10.20.0.0/16" # Prefixo de endereço da VNet (diferente da P2S para evitar conflitos)
+gateway_subnet_name="GatewaySubnet" # Nome da sub-rede para o Gateway VPN (OBRIGATÓRIO ser GatewaySubnet)
+gateway_subnet_prefix="10.20.0.0/24" # Prefixo de endereço da sub-rede do Gateway (mínimo /27)
+
+echo "Iniciando a criação da infraestrutura de rede para VPN Site-to-Site no Azure..."
+
+# 1. Criar Grupo de Recursos
+echo "Criando o Grupo de Recursos: $rg_name na região $location..."
+az group create \
+    --name $rg_name \
+    --location $location \
+    --output none
+
+# 2. Criar Rede Virtual (VNet)
+echo "Criando a Rede Virtual: $vnet_name com prefixo $vnet_prefix..."
+az network vnet create \
+    --resource-group $rg_name \
+    --name $vnet_name \
+    --address-prefix $vnet_prefix \
+    --location $location \
+    --output none
+
+# 3. Criar a Sub-rede para o Gateway VPN
+# É essencial que esta sub-rede seja nomeada "GatewaySubnet" para que o Azure a reconheça.
+echo "Criando a GatewaySubnet: $gateway_subnet_name com prefixo $gateway_subnet_prefix na VNet $vnet_name..."
+az network vnet subnet create \
+    --resource-group $rg_name \
+    --vnet-name $vnet_name \
+    --name $gateway_subnet_name \
+    --address-prefix $gateway_subnet_prefix \
+    --output none
+
+echo "Infraestrutura de rede Azure para S2S criada com sucesso!"
+echo "Grupo de Recursos: $rg_name"
+echo "VNet: $vnet_name ($vnet_prefix)"
+echo "GatewaySubnet: $gateway_subnet_name ($gateway_subnet_prefix)"

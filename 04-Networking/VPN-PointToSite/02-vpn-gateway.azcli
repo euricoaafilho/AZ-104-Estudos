@@ -1,0 +1,52 @@
+# -----------------------------------------------------------------------------
+# Script: 02-vpn-gateway.azcli
+# Descrição: Cria o Virtual Network Gateway (VPN Gateway) no Azure.
+#            Este gateway será do tipo VPN, SKU Basic, e usará o tipo de VPN
+#            RouteBased, necessário para P2S e para futuras integrações com BGP.
+# -----------------------------------------------------------------------------
+
+# --- Configurações Iniciais (devem ser as mesmas do script 01) ---
+rg_name="rg-vpn-p2s"
+location="eastus"
+vnet_name="vnet-p2s"
+vpn_gateway_name="vnet-p2s-gw" # Nome do seu VPN Gateway
+public_ip_name="vnet-p2s-gw-pip" # Nome do IP Público para o Gateway
+
+# --- Criação de Recursos ---
+
+echo "Iniciando a criação do VPN Gateway..."
+
+# 1. Criar um Endereço IP Público para o VPN Gateway
+# O VPN Gateway precisa de um IP público para ser acessível.
+echo "Criando o IP Público: $public_ip_name..."
+az network public-ip create \
+    --resource-group $rg_name \
+    --name $public_ip_name \
+    --location $location \
+    --allocation-method Dynamic \
+    --sku Basic \
+    --output none
+
+# 2. Criar o Virtual Network Gateway (VPN Gateway)
+# Este é o componente principal para a conectividade VPN.
+# - --gateway-type Vpn: Indica que é um gateway VPN.
+# - --vpn-type RouteBased: Essencial para P2S e para cenários mais avançados.
+# - --sku Basic: Um SKU de baixo custo para testes e ambientes de desenvolvimento.
+#                Para produção, considere VpnGw1, VpnGw2, etc.
+# - --no-wait: Permite que o script continue sem esperar a conclusão da criação do gateway,
+#              que pode levar de 30 a 45 minutos. Você pode remover isso se quiser esperar.
+echo "Criando o VPN Gateway: $vpn_gateway_name (isso pode levar de 30 a 45 minutos)..."
+az network vnet-gateway create \
+    --resource-group $rg_name \
+    --name $vpn_gateway_name \
+    --location $location \
+    --public-ip-address $public_ip_name \
+    --vnet $vnet_name \
+    --gateway-type Vpn \
+    --vpn-type RouteBased \
+    --sku Basic \
+    --no-wait \
+    --output none
+
+echo "Comando para criação do VPN Gateway enviado. A criação pode levar um tempo considerável."
+echo "Você pode verificar o status da criação com: az network vnet-gateway show -g $rg_name -n $vpn_gateway_name -o table"

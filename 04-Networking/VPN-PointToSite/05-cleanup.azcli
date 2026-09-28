@@ -1,0 +1,40 @@
+# -----------------------------------------------------------------------------
+# Script: 05-cleanup.azcli
+# Descrição: Remove todos os recursos criados para o projeto de VPN Point-to-Site.
+#            Isso inclui o Grupo de Recursos, VPN Gateway, VNet, IPs Públicos,
+#            e o App Registration no Azure AD.
+# -----------------------------------------------------------------------------
+
+# --- Configurações Iniciais (devem ser as mesmas dos scripts anteriores) ---
+rg_name="rg-vpn-p2s"
+aad_app_name="AzureVPN-P2S-App" # Nome do App Registration criado
+
+echo "Iniciando o processo de limpeza dos recursos do projeto VPN P2S..."
+
+# 1. Remover o Grupo de Recursos
+# A remoção do Grupo de Recursos automaticamente remove todos os recursos contidos nele,
+# como o VPN Gateway, VNet, Subnets, IP Público, etc.
+# Este é o método mais eficiente para limpar tudo de uma vez.
+echo "Removendo o Grupo de Recursos: $rg_name (isso pode levar alguns minutos)..."
+az group delete \
+    --name $rg_name \
+    --yes \
+    --no-wait \
+    --output none
+
+# 2. Remover o App Registration do Azure AD
+# O App Registration não é removido com o Grupo de Recursos, pois ele está no Azure AD.
+echo "Buscando o App ID do App Registration '$aad_app_name' para remoção..."
+app_id=$(az ad app list --display-name $aad_app_name --query "[0].appId" -o tsv)
+
+if [ -n "$app_id" ]; then
+    echo "Removendo o App Registration com App ID: $app_id..."
+    az ad app delete --id $app_id --output none
+    echo "App Registration '$aad_app_name' removido com sucesso."
+else
+    echo "App Registration '$aad_app_name' não encontrado ou já removido."
+fi
+
+echo "Comando para remoção do Grupo de Recursos enviado. A limpeza completa pode levar um tempo."
+echo "O App Registration foi processado para remoção."
+echo "Limpeza concluída!"
